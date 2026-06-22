@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Dashboard — Day 11</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=jet-brains-mono@400,700&display=swap" rel="stylesheet">
+  <style>
+    :root,[data-theme="light"]{
+      --bg:#f7f6f2;--surface:#f9f8f5;--surface-off:#f0ede8;--surface-2:#fbfbf9;
+      --divider:#dcd9d5;--border:#d4d1ca;
+      --text:#28251d;--muted:#7a7974;--faint:#bab9b4;
+      --primary:#01696f;--primary-h:#0c4e54;--primary-hi:#cedcd8;
+      --error:#a12c7b;--error-hi:#f3e8ef;
+      --success:#437a22;--success-hi:#e2eed9;
+      --orange:#da7101;
+      --shadow-sm:0 1px 2px oklch(0.2 0.01 80/.06);
+      --shadow-md:0 4px 12px oklch(0.2 0.01 80/.08);
+      --shadow-lg:0 12px 32px oklch(0.2 0.01 80/.12);
+      --r-sm:.375rem;--r-md:.5rem;--r-lg:.75rem;--r-xl:1rem;--r-full:9999px;
+      --font:'Satoshi',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+      --ease:180ms cubic-bezier(.16,1,.3,1);
+    }
+    [data-theme="dark"]{
+      --bg:#171614;--surface:#1c1b19;--surface-off:#1d1c1a;--surface-2:#201f1d;
+      --divider:#262523;--border:#393836;
+      --text:#cdccca;--muted:#797876;--faint:#5a5957;
+      --primary:#4f98a3;--primary-h:#227f8b;--primary-hi:#1e3335;
+      --error:#d163a7;--error-hi:#2a1a24;
+      --success:#6daa45;--success-hi:#1a2a14;
+      --orange:#fdab43;
+      --shadow-sm:0 1px 2px oklch(0 0 0/.2);
+      --shadow-md:0 4px 12px oklch(0 0 0/.3);
+      --shadow-lg:0 12px 32px oklch(0 0 0/.4);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+    body{min-height:100dvh;font-family:var(--font);font-size:clamp(.875rem,.8rem + .35vw,1rem);color:var(--text);background:var(--bg);line-height:1.6}
+    button{cursor:pointer;background:none;border:none;font:inherit;color:inherit}
+    a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+    h1,h2,h3,h4{text-wrap:balance;line-height:1.2}
+    code{font-family:var(--mono);font-size:.85em;background:var(--surface-off);padding:.1em .35em;border-radius:var(--r-sm)}
+    :focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:var(--r-sm)}
+
+    /* ── TOPBAR ── */
+    .topbar{position:sticky;top:0;z-index:200;background:color-mix(in oklch,var(--bg) 88%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--divider);padding:.6rem 1.25rem}
+    .topbar-inner{max-width:1100px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.95rem;color:var(--text)}
+    .logo svg{color:var(--primary)}
+    .topbar-right{display:flex;align-items:center;gap:.5rem}
+
+    /* ── LAYOUT ── */
+    .shell{max-width:1100px;margin-inline:auto;padding:1.5rem 1.25rem 4rem;display:grid;grid-template-columns:1fr;gap:1.25rem}
+
+    /* ── SCROLL BAR ── */
+    .scroll-bar-wrap{position:sticky;top:53px;z-index:100;background:color-mix(in oklch,var(--bg) 92%,transparent);backdrop-filter:blur(8px);padding:.5rem 0;margin-bottom:-.5rem}
+    .scroll-bar-inner{max-width:1100px;margin-inline:auto;padding:0 1.25rem;display:flex;align-items:center;gap:1rem}
+    .scroll-track{flex:1;height:6px;background:var(--surface-off);border-radius:var(--r-full);overflow:hidden}
+    .scroll-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--orange));border-radius:var(--r-full);width:0%;transition:width .15s linear}
+    .scroll-label{font-size:.72rem;font-family:var(--mono);color:var(--muted);min-width:52px;text-align:right}
+    .scroll-badge{font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:var(--r-full);background:var(--success-hi);color:var(--success)}
+
+    /* ── HERO STRIP ── */
+    .hero-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:1.5rem 1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;box-shadow:var(--shadow-sm)}
+    .hero-title{font-size:clamp(1.5rem,1rem + 1.5vw,2.5rem);font-weight:700}
+    .hero-title span{color:var(--primary)}
+    .hero-sub{font-size:.85rem;color:var(--muted);margin-top:.25rem}
+    .tag-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+    .tag{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:.2rem .6rem;border-radius:var(--r-full);border:1px solid transparent}
+    .tag-debounce{background:var(--primary-hi);color:var(--primary);border-color:color-mix(in oklch,var(--primary) 30%,transparent)}
+    .tag-throttle{background:color-mix(in oklch,var(--orange) 15%,transparent);color:var(--orange);border-color:color-mix(in oklch,var(--orange) 30%,transparent)}
+    .tag-virtual{background:var(--success-hi);color:var(--success);border-color:color-mix(in oklch,var(--success) 30%,transparent)}
+    .tag-memo{background:var(--error-hi);color:var(--error);border-color:color-mix(in oklch,var(--error) 30%,transparent)}
+
+    /* ── STATS ROW ── */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:.9rem 1.1rem;box-shadow:var(--shadow-sm)}
+    .stat-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+    .stat-value{font-size:clamp(1.4rem,1rem + .8vw,2rem);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;margin-top:.15rem}
+    .stat-value.green{color:var(--success)}.stat-value.orange{color:var(--orange)}.stat-value.blue{color:var(--primary)}
+    .stat-delta{font-size:.72rem;color:var(--muted);margin-top:.1rem}
+
+    /* ── PANEL ── */
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-sm)}
+    .panel-head{padding:.8rem 1.1rem;border-bottom:1px solid var(--divider);background:var(--surface-off);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+    .panel-title{font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:.5rem}
+    .panel-title .dot-icon{width:8px;height:8px;border-radius:50%;background:var(--primary)}
+    .panel-body{padding:1.1rem}
+
+    /* ── SEARCH ── */
+    .search-wrap{position:relative}
+    .search-icon{position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+    .search-input{width:100%;padding:.6rem .75rem .6rem 2.3rem;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg);color:var(--text);font-family:var(--font);font-size:.9rem;transition:border-color var(--ease),box-shadow var(--ease);outline:none}
+    .search-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 20%,transparent)}
+    .search-input::placeholder{color:var(--faint)}
+    .search-meta{display:flex;align-items:center;justify-content:space-between;margin-top:.5rem;font-size:.75rem;color:var(--muted)}
+    .search-status{display:flex;align-items:center;gap:.4rem}
+    .pulse{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite}
+    .pulse.searching{background:var(--orange);animation:pulse .6s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* ── USER LIST (virtualized) ── */
+    .list-container{position:relative;overflow:hidden;border-radius:var(--r-lg);border:1px solid var(--border)}
+    .virtual-viewport{height:520px;overflow-y:auto;overflow-x:hidden}
+    .virtual-viewport::-webkit-scrollbar{width:6px}
+    .virtual-viewport::-webkit-scrollbar-track{background:transparent}
+    .virtual-viewport::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .virtual-spacer{position:relative}
+    .user-row{position:absolute;left:0;right:0;display:flex;align-items:center;gap:.9rem;padding:0 1rem;border-bottom:1px solid var(--divider);transition:background var(--ease)}
+    .user-row:hover{background:var(--surface-off)}
+    .avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;border:2px solid var(--border)}
+    .user-name{font-weight:600;font-size:.87rem}
+    .user-email{font-size:.75rem;color:var(--muted);font-family:var(--mono)}
+    .user-id{font-size:.7rem;font-family:var(--mono);color:var(--faint);margin-left:auto}
+    .user-bio{font-size:.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+    .empty-state{height:520px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;color:var(--muted);font-size:.9rem}
+    .empty-state svg{color:var(--faint)}
+
+    /* ── CODE ── */
+    .code-wrap{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.75rem}
+    .code-head{display:flex;align-items:center;justify-content:space-between;padding:.4rem .85rem;background:var(--surface-off);border-bottom:1px solid var(--divider)}
+    .code-lbl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;align-items:center;gap:.4rem}
+    .cdot{width:8px;height:8px;border-radius:50%}.r{background:#ff5f57}.y{background:#febc2e}.g{background:#28c840}
+    .cpbtn{font-size:.7rem;font-weight:500;color:var(--muted);padding:.15rem .45rem;border-radius:var(--r-sm);transition:background var(--ease),color var(--ease)}.cpbtn:hover{background:var(--surface-2);color:var(--text)}
+    pre{padding:1rem;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.7;color:var(--text);margin:0}
+    .kw{color:var(--primary);font-weight:600}.fn{color:var(--orange)}.str{color:var(--success)}.cmt{color:var(--faint);font-style:italic}
+    .hl-g{background:color-mix(in oklch,var(--success) 12%,transparent);border-left:3px solid var(--success);padding-left:.5rem;display:block}
+
+    /* ── RENDER LOG ── */
+    .render-log{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:.6rem .85rem;font-family:var(--mono);font-size:.72rem;max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:.2rem}
+    .log-row{display:flex;align-items:center;gap:.4rem;padding:.15rem 0;border-bottom:1px solid var(--divider);animation:si .2s ease}
+    .log-row:last-child{border-bottom:none}@keyframes si{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+    .lb{font-size:.65rem;font-weight:700;padding:.1rem .35rem;border-radius:var(--r-sm);flex-shrink:0}
+    .lb-d{background:var(--primary-hi);color:var(--primary)}.lb-t{background:color-mix(in oklch,var(--orange) 15%,transparent);color:var(--orange)}
+    .lb-v{background:var(--success-hi);color:var(--success)}.lb-m{background:var(--error-hi);color:var(--error)}
+    .log-ts{color:var(--faint);font-size:.65rem;margin-left:auto}
+    .log-empty-msg{color:var(--faint);font-style:italic}
+
+    /* ── BUTTONS ── */
+    .btn{display:inline-flex;align-items:center;gap:.35rem;padding:.4rem .9rem;border-radius:var(--r-md);font-size:.82rem;font-weight:600;transition:background var(--ease),color var(--ease);border:1px solid transparent}
+    .btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-h)}
+    .btn-g{background:transparent;border-color:var(--border);color:var(--text)}.btn-g:hover{background:var(--surface-off)}
+    .btn-xs{padding:.2rem .5rem;font-size:.7rem}
+
+    /* ── PERF GRID (bottom section) ── */
+    .perf-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+    @media(max-width:640px){.perf-grid{grid-template-columns:1fr}}
+
+    /* ── FOOTER ── */
+    .footer{margin-top:2rem;padding-top:1.25rem;border-top:1px solid var(--divider);display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;font-size:.72rem;color:var(--faint)}
+
+    /* ── TOGGLE ── */
+    .toggle-row{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted)}
+    .toggle{appearance:none;width:34px;height:18px;border-radius:var(--r-full);background:var(--border);cursor:pointer;position:relative;transition:background var(--ease);flex-shrink:0}
+    .toggle:checked{background:var(--primary)}
+    .toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform var(--ease);box-shadow:0 1px 3px oklch(0 0 0/.3)}
+    .toggle:checked::after{transform:translateX(16px)}
+
+    /* ── LOADING ── */
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;display:none}
+    .spinner.active{display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<!-- ── TOPBAR ── -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="3.5" fill="currentColor"/><ellipse cx="11" cy="11" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.5" fill="none"/><ellipse cx="11" cy="11" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.5" fill="none" transform="rotate(60 11 11)"/><ellipse cx="11" cy="11" rx="10" ry="4.5" stroke="currentColor" stroke-width="1.5" fill="none" transform="rotate(120 11 11)"/></svg>
+      Performance Dashboard
+    </div>
+    <div class="topbar-right">
+      <a href="https://github.com/hajdun/15-days-of-react-design-patterns/tree/main/day-11/performance-patterns/src/performance" target="_blank" style="font-size:.78rem;color:var(--muted)">View source</a>
+      <button data-theme-toggle style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);color:var(--muted);transition:color var(--ease),background var(--ease)" aria-label="Toggle theme"></button>
+    </div>
+  </div>
+</header>
+
+<!-- ── SCROLL PROGRESS ── -->
+<div class="scroll-bar-wrap">
+  <div class="scroll-bar-inner">
+    <div class="scroll-track"><div class="scroll-fill" id="scrollFill"></div></div>
+    <span class="scroll-label" id="scrollLabel">0 px</span>
+    <span class="scroll-badge" id="scrollBadge">throttled</span>
+  </div>
+</div>
+
+<main class="shell">
+
+  <!-- HERO -->
+  <div class="hero-strip">
+    <div>
+      <div class="hero-title">Mini <span>Performance</span> Dashboard</div>
+      <div class="hero-sub">Day 11 · 10K user list · debounce · throttle · virtualization · useMemo</div>
+      <div class="tag-row">
+        <span class="tag tag-debounce">⏱ Debounce</span>
+        <span class="tag tag-throttle">⚡ Throttle</span>
+        <span class="tag tag-virtual">📋 Virtual List</span>
+        <span class="tag tag-memo">🧠 useMemo</span>
+      </div>
+    </div>
+    <a href="https://www.youtube.com/watch?v=keTcXT145CI" target="_blank" class="btn btn-p">▶ Watch Course</a>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value blue" id="statTotal">10,000</div><div class="stat-delta">generated in memory</div></div>
+    <div class="stat-card"><div class="stat-label">Visible rows</div><div class="stat-value green" id="statVisible">~7</div><div class="stat-delta">react-window virtualization</div></div>
+    <div class="stat-card"><div class="stat-label">Filtered</div><div class="stat-value orange" id="statFiltered">10,000</div><div class="stat-delta">derived state — no useState</div></div>
+    <div class="stat-card"><div class="stat-label">Scroll position</div><div class="stat-value" id="statScroll">0 px</div><div class="stat-delta">throttled 150ms</div></div>
+  </div>
+
+  <!-- SEARCH + LIST -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="dot-icon"></span>User Directory</div>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <span class="spinner" id="spinner"></span>
+        <span id="filterInfo" style="font-size:.75rem;color:var(--muted)">Showing all 10,000 users</span>
+      </div>
+    </div>
+    <div class="panel-body">
+      <!-- SEARCH -->
+      <div class="search-wrap" style="margin-bottom:.85rem">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search by name or email… (debounced 300ms)" autocomplete="off" />
+      </div>
+      <div class="search-meta">
+        <div class="search-status"><span class="pulse" id="pulseDot"></span><span id="searchStatus">Idle — type to search</span></div>
+        <span id="debounceTimer" style="font-family:var(--mono)"></span>
+      </div>
+
+      <!-- VIRTUAL LIST -->
+      <div class="list-container" style="margin-top:.85rem">
+        <div class="virtual-viewport" id="virtualViewport">
+          <div class="virtual-spacer" id="virtualSpacer">
+            <!-- rows injected by JS -->
+          </div>
+        </div>
+        <div class="empty-state" id="emptyState" style="display:none">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <span>No users match "<span id="emptyQuery"></span>"</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE SECTION -->
+  <div class="perf-grid">
+
+    <!-- DEBOUNCE panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">⏱ Debounce Pattern</div>
+        <span class="tag tag-debounce">SearchBox.jsx</span>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.85rem">API call fires only after user pauses typing for 300ms. Without debounce, every keystroke triggers a search re-computation.</p>
+        <div class="code-wrap"><div class="code-head"><div class="code-lbl"><span class="cdot r"></span><span class="cdot y"></span><span class="cdot g"></span>&nbsp;useDebounce.js</div><button class="cpbtn" onclick="copyCode(this,'c1')">Copy</button></div><pre id="c1"><span class="kw">function</span> <span class="fn">useDebounce</span>(value, delay = 300) {
+  <span class="kw">const</span> [debounced, setDebounced] = <span class="fn">useState</span>(value);
+  <span class="kw">useEffect</span>(() =&gt; {
+<span class="hl-g">    <span class="kw">const</span> id = <span class="fn">setTimeout</span>(() =&gt; <span class="fn">setDebounced</span>(value), delay);
+    <span class="kw">return</span> () =&gt; <span class="fn">clearTimeout</span>(id); <span class="cmt">// cancel on next keystroke</span></span>
+  }, [value, delay]);
+  <span class="kw">return</span> debounced;
+}</pre></div>
+        <div class="render-log" id="debounceLog"><div class="log-empty-msg">— type in the search bar —</div></div>
+      </div>
+    </div>
+
+    <!-- THROTTLE panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">⚡ Throttle Pattern</div>
+        <span class="tag tag-throttle">ScrollTracker.jsx</span>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.85rem">Scroll position updates at most once every 150ms — not on every pixel. Prevents flooding the render cycle on fast scrolls.</p>
+        <div class="code-wrap"><div class="code-head"><div class="code-lbl"><span class="cdot r"></span><span class="cdot y"></span><span class="cdot g"></span>&nbsp;useThrottle.js</div><button class="cpbtn" onclick="copyCode(this,'c2')">Copy</button></div><pre id="c2"><span class="kw">function</span> <span class="fn">useThrottle</span>(value, limit = 150) {
+  <span class="kw">const</span> [throttled, setThrottled] = <span class="fn">useState</span>(value);
+  <span class="kw">const</span> lastRun = <span class="fn">useRef</span>(<span class="fn">Date</span>.<span class="fn">now</span>());
+  <span class="kw">useEffect</span>(() =&gt; {
+<span class="hl-g">    <span class="kw">if</span> (<span class="fn">Date</span>.<span class="fn">now</span>() - lastRun.current &gt;= limit) {
+      lastRun.current = <span class="fn">Date</span>.<span class="fn">now</span>();
+      <span class="fn">setThrottled</span>(value);
+    }</span>
+  }, [value, limit]);
+  <span class="kw">return</span> throttled;
+}</pre></div>
+        <div class="render-log" id="throttleLog"><div class="log-empty-msg">— scroll the page —</div></div>
+      </div>
+    </div>
+
+    <!-- VIRTUALIZATION panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">📋 Virtualization</div>
+        <span class="tag tag-virtual">VirtualList.jsx</span>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.85rem">Only ~7 DOM rows are rendered at any time regardless of list size. Uses a fixed-size virtual window to maintain scroll position.</p>
+        <div class="code-wrap"><div class="code-head"><div class="code-lbl"><span class="cdot r"></span><span class="cdot y"></span><span class="cdot g"></span>&nbsp;VirtualList.jsx (concept)</div><button class="cpbtn" onclick="copyCode(this,'c3')">Copy</button></div><pre id="c3"><span class="cmt">// Only rows in the viewport window are rendered</span>
+<span class="kw">const</span> ROW_H = 72;
+<span class="kw">const</span> startIdx = <span class="fn">Math</span>.<span class="fn">floor</span>(scrollTop / ROW_H);
+<span class="kw">const</span> endIdx = <span class="fn">Math</span>.<span class="fn">min</span>(
+  startIdx + visibleRows + overscan,
+  items.length
+);
+<span class="cmt">// Total spacer height keeps scroll accurate</span>
+<span class="kw">const</span> totalHeight = items.length * ROW_H;</pre></div>
+      </div>
+    </div>
+
+    <!-- DERIVED STATE panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🧠 useMemo + Derived State</div>
+        <span class="tag tag-memo">No useState for filtered</span>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.85rem"><code>filtered</code> is derived directly from <code>users</code> + <code>debouncedQuery</code> via <code>useMemo</code>. No <code>useState</code>, no <code>useEffect</code> sync.</p>
+        <div class="code-wrap"><div class="code-head"><div class="code-lbl"><span class="cdot r"></span><span class="cdot y"></span><span class="cdot g"></span>&nbsp;Dashboard.jsx</div><button class="cpbtn" onclick="copyCode(this,'c4')">Copy</button></div><pre id="c4"><span class="kw">const</span> users = <span class="fn">useMemo</span>(() =&gt; <span class="fn">generateUsers</span>(10_000), []);
+
+<span class="kw">const</span> debouncedQuery = <span class="fn">useDebounce</span>(query, 300);
+
+<span class="cmt">// ✅ Derived — no useState, always in sync</span>
+<span class="kw">const</span> filtered = <span class="fn">useMemo</span>(() =&gt;
+<span class="hl-g">  debouncedQuery
+    ? users.<span class="fn">filter</span>(u =&gt;
+        u.name.<span class="fn">toLowerCase</span>().<span class="fn">includes</span>(debouncedQuery.<span class="fn">toLowerCase</span>()) ||
+        u.email.<span class="fn">toLowerCase</span>().<span class="fn">includes</span>(debouncedQuery.<span class="fn">toLowerCase</span>()))
+    : users,</span>
+  [users, debouncedQuery]
+);</pre></div>
+      </div>
+    </div>
+
+  </div><!-- /perf-grid -->
+
+  <footer class="footer"><span>React Performance · Day 11 — Dashboard</span><span><a href="https://www.youtube.com/watch?v=keTcXT145CI" target="_blank">freeCodeCamp course by Tapas Adhikary</a></span></footer>
+</main>
+
+<script>
+// ────────────────────────────────────────────
+// DATA  (10 000 users generated synchronously)
+// ────────────────────────────────────────────
+const TOTAL = 10000;
+const COLORS = ['#4f98a3','#6daa45','#d163a7','#fdab43','#a78bfa','#f87171','#34d399','#60a5fa'];
+const users = Array.from({length:TOTAL},(_,i)=>({
+  id:i,
+  name:`User ${i}`,
+  email:`user${i}@example.com`,
+  bio:`Short bio for user ${i} — generated for demo.`
+}));
+document.getElementById('statTotal').textContent = TOTAL.toLocaleString();
+
+// ────────────────────────────────────────────
+// THEME TOGGLE
+// ────────────────────────────────────────────
+(function(){
+  const t = document.querySelector('[data-theme-toggle]');
+  const r = document.documentElement;
+  let d = r.getAttribute('data-theme')||'dark';
+  const icons = {
+    dark:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    light:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+  };
+  t.innerHTML=icons[d];
+  t.addEventListener('click',()=>{d=d==='dark'?'light':'dark';r.setAttribute('data-theme',d);t.innerHTML=icons[d];});
+})();
+
+// ────────────────────────────────────────────
+// DEBOUNCE utility
+// ────────────────────────────────────────────
+function debounce(fn, delay){
+  let timer;
+  return function(...args){
+    clearTimeout(timer);
+    timer = setTimeout(()=>fn(...args), delay);
+  };
+}
+
+// ────────────────────────────────────────────
+// THROTTLE utility
+// ────────────────────────────────────────────
+function throttle(fn, limit){
+  let lastRun = 0;
+  return function(...args){
+    const now = Date.now();
+    if(now - lastRun >= limit){ lastRun=now; fn(...args); }
+  };
+}
+
+// ────────────────────────────────────────────
+// VIRTUAL LIST
+// ────────────────────────────────────────────
+const ROW_H = 72;
+const OVERSCAN = 3;
+const viewport = document.getElementById('virtualViewport');
+const spacer   = document.getElementById('virtualSpacer');
+const emptyEl  = document.getElementById('emptyState');
+
+let currentUsers = users;
+let rowPool = [];
+
+function renderVisible(){
+  const count = currentUsers.length;
+  spacer.style.height = count * ROW_H + 'px';
+
+  if(count === 0){
+    emptyEl.style.display='flex';
+    viewport.style.display='none';
+    return;
+  }
+  emptyEl.style.display='none';
+  viewport.style.display='block';
+
+  const scrollTop = viewport.scrollTop;
+  const startIdx = Math.max(0, Math.floor(scrollTop/ROW_H) - OVERSCAN);
+  const visibleCount = Math.ceil(viewport.clientHeight/ROW_H);
+  const endIdx = Math.min(count-1, startIdx + visibleCount + OVERSCAN*2);
+
+  // Remove rows outside window
+  rowPool = rowPool.filter(row=>{
+    const i = parseInt(row.dataset.idx);
+    if(i < startIdx || i > endIdx){ row.remove(); return false; }
+    return true;
+  });
+  const rendered = new Set(rowPool.map(r=>parseInt(r.dataset.idx)));
+
+  for(let i=startIdx; i<=endIdx; i++){
+    if(rendered.has(i)) continue;
+    const u = currentUsers[i];
+    const row = document.createElement('div');
+    row.className='user-row';
+    row.dataset.idx=i;
+    row.style.top = i*ROW_H+'px';
+    row.style.height = ROW_H+'px';
+    const color = COLORS[u.id % COLORS.length];
+    const initials = u.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+    row.innerHTML = `
+      <div class="avatar" style="background:${color}22;color:${color};border-color:${color}55">${initials}</div>
+      <div style="min-width:0;flex:1">
+        <div class="user-name">${u.name}</div>
+        <div class="user-email">${u.email}</div>
+      </div>
+      <div class="user-bio">${u.bio}</div>
+      <div class="user-id">#${u.id}</div>`;
+    spacer.appendChild(row);
+    rowPool.push(row);
+  }
+  document.getElementById('statVisible').textContent = (endIdx-startIdx+1);
+}
+
+viewport.addEventListener('scroll', ()=>{ renderVisible(); });
+renderVisible();
+
+// ────────────────────────────────────────────
+// SEARCH + DEBOUNCE
+// ────────────────────────────────────────────
+let debounceLogCount = 0;
+function addDebounceLog(msg, type='d'){
+  const log=document.getElementById('debounceLog');
+  const empty=log.querySelector('.log-empty-msg');
+  if(empty)empty.remove();
+  if(debounceLogCount>40){const first=log.querySelector('.log-row');if(first)first.remove();}
+  const row=document.createElement('div');row.className='log-row';
+  const now=new Date();const ts=`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  row.innerHTML=`<span class="lb lb-${type}">${type.toUpperCase()}</span><span>${msg}</span><span class="log-ts">${ts}</span>`;
+  log.appendChild(row);log.scrollTop=log.scrollHeight;debounceLogCount++;
+}
+
+const spinner  = document.getElementById('spinner');
+const pulseDot = document.getElementById('pulseDot');
+const statusEl = document.getElementById('searchStatus');
+const filterInfo = document.getElementById('filterInfo');
+
+const doSearch = debounce(function(query){
+  // Derived state — no useState sync
+  const q = query.toLowerCase().trim();
+  const start = performance.now();
+  currentUsers = q
+    ? users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+    : users;
+  const ms = (performance.now()-start).toFixed(1);
+
+  rowPool.forEach(r=>r.remove());
+  rowPool=[];
+  viewport.scrollTop=0;
+  renderVisible();
+
+  const count = currentUsers.length;
+  document.getElementById('statFiltered').textContent = count.toLocaleString();
+  filterInfo.textContent = q ? `${count.toLocaleString()} users match "${query}"` : `Showing all ${TOTAL.toLocaleString()} users`;
+  document.getElementById('emptyQuery').textContent = query;
+
+  spinner.classList.remove('active');
+  pulseDot.classList.remove('searching');
+  statusEl.textContent = q ? `Found ${count.toLocaleString()} users in ${ms}ms` : 'Idle — type to search';
+  addDebounceLog(`Fired: "${query}" → ${count.toLocaleString()} results (${ms}ms)`, 'd');
+}, 300);
+
+document.getElementById('searchInput').addEventListener('input', function(e){
+  const v=e.target.value;
+  spinner.classList.add('active');
+  pulseDot.classList.add('searching');
+  statusEl.textContent='Waiting for debounce…';
+  addDebounceLog(`Keystroke: "${v}" — debounce reset`, 'd');
+  doSearch(v);
+});
+
+// ────────────────────────────────────────────
+// SCROLL TRACKER + THROTTLE
+// ────────────────────────────────────────────
+let throttleLogCount=0;
+function addThrottleLog(msg){
+  const log=document.getElementById('throttleLog');
+  const empty=log.querySelector('.log-empty-msg');
+  if(empty)empty.remove();
+  if(throttleLogCount>40){const first=log.querySelector('.log-row');if(first)first.remove();}
+  const row=document.createElement('div');row.className='log-row';
+  const now=new Date();const ts=`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  row.innerHTML=`<span class="lb lb-t">T</span><span>${msg}</span><span class="log-ts">${ts}</span>`;
+  log.appendChild(row);log.scrollTop=log.scrollHeight;throttleLogCount++;
+}
+
+let rawScrollY = 0;
+const docH = ()=>document.documentElement.scrollHeight - window.innerHeight;
+
+const updateScrollThrottled = throttle(function(y){
+  const pct = docH()>0 ? Math.round(y/docH()*100) : 0;
+  document.getElementById('scrollFill').style.width=pct+'%';
+  document.getElementById('scrollLabel').textContent=y+'px';
+  document.getElementById('statScroll').textContent=y+' px';
+  addThrottleLog(`Scroll update: ${y}px (${pct}%)`);
+}, 150);
+
+window.addEventListener('scroll', ()=>{
+  rawScrollY = Math.round(window.scrollY);
+  updateScrollThrottled(rawScrollY);
+});
+
+// ────────────────────────────────────────────
+// COPY CODE
+// ────────────────────────────────────────────
+function copyCode(btn,id){const el=document.getElementById(id);navigator.clipboard.writeText(el.innerText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy',1500);});}
+</script>
+</body>
+</html>
