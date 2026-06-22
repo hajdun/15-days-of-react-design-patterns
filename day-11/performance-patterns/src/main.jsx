@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+
 import App from './App.jsx'
 import './index.css'
 import ChildDemonstration from './pages/ChildDemonstration.jsx'
@@ -17,25 +18,34 @@ import Transition from './pages/Transition.jsx'
 import Virtualize from './pages/Virtualize.jsx'
 
 const router = createBrowserRouter([
-  { path: '/', element: <ChildDemonstration /> },
-  { path: '/component_isolation', element: <ComponentIsolationDemo /> },
-  { path: '/debounce', element: <Debounce /> },
-  { path: '/deferred', element: <Deferred /> },
-  { path: '/lazy_loading', element: <LazyLoadingDemo /> },
-  { path: '/memoize', element: <Memoize /> },
-  { path: '/memoize_sort', element: <MemoizeSort /> },
-  { path: '/non_lazy_loading', element: <NonLazyLoadingDemo /> },
-  { path: '/render_tracker', element: <RenderTrackerDemo /> },
-  { path: '/throttle', element: <Throttle /> },
-  { path: '/transition', element: <Transition /> },
-  { path: '/virtualize', element: <Virtualize /> },
+  {
+    path: '/',
+    element: <App />,   // ← nav lives here
+    children: [
+      { index: true, element: <ChildDemonstration /> },
+      { path: '/component_isolation', element: <ComponentIsolationDemo /> },
+      { path: '/debounce', element: <Debounce /> },
+      { path: '/deferred', element: <Deferred /> },
+      { path: '/lazy_loading', element: <LazyLoadingDemo /> },
+      { path: '/memoize', element: <Memoize /> },
+      { path: '/memoize_sort', element: <MemoizeSort /> },
+      { path: '/non_lazy_loading', element: <NonLazyLoadingDemo /> },
+      { path: '/render_tracker', element: <RenderTrackerDemo /> },
+      { path: '/throttle', element: <Throttle /> },
+      { path: '/transition', element: <Transition /> },
+      { path: '/virtualize', element: <Virtualize /> },]
+  }
 ])
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <RouterProvider router={router} >
-      <App />
+      <>
+
+
+        <App />
+      </>
     </RouterProvider>
-  </React.StrictMode>,
+  </React.StrictMode >,
 )
