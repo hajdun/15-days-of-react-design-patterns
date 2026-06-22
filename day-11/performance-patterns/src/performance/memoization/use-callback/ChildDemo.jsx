@@ -9,6 +9,7 @@ const ChildDemo = () => {
 
     console.log("App Rendered");
 
+    // handleClick
     return (
         <div className="p-2 border rounded">
             <p>Count: {count}</p>
