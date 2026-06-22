@@ -1,5 +1,5 @@
-import {useState} from 'react'
-import RenderTracker from './RenderTracker';
+import { useState } from 'react'
+import RenderTracker from '../performance/rerenders/RenderTracker';
 
 const RenderTrackerDemo = () => {
   const [value, setValue] = useState("");
