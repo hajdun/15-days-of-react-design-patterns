@@ -1,0 +1,645 @@
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>React 19 Compiler — Remove Unnecessary Memoization</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #7c6af7;
+    --accent2: #4fc3f7;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --code-bg: #12151f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 40px;
+  }
+
+  header .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+
+  header h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 6px;
+  }
+
+  nav {
+    display: flex;
+    gap: 8px;
+    padding: 16px 40px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  nav a {
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    transition: all .2s;
+  }
+
+  nav a:hover, nav a.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .stat-card .label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    margin-bottom: 6px;
+  }
+
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+
+  .stat-card .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .stat-card.green .value { color: var(--green); }
+  .stat-card.red .value { color: var(--red); }
+  .stat-card.yellow .value { color: var(--yellow); }
+
+  section.pattern {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+
+  .pattern-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pattern-icon {
+    font-size: 26px;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .pattern-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .pattern-header .file-tag {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--accent2);
+    padding: 2px 10px;
+    margin-top: 4px;
+    font-family: monospace;
+  }
+
+  .pattern-header p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .pattern-body {
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 700px) {
+    .pattern-body { grid-template-columns: 1fr; }
+  }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .code-block .code-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .code-block .code-title .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-red { background: #f87171; }
+  .dot-yellow { background: #fbbf24; }
+  .dot-green { background: #4ade80; }
+
+  .code-block pre {
+    padding: 18px 16px;
+    font-size: 13px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .kw { color: #c792ea; }
+  .fn { color: #82aaff; }
+  .str { color: #c3e88d; }
+  .num { color: #f78c6c; }
+  .cmt { color: #546e7a; font-style: italic; }
+  .tag { color: #f07178; }
+  .attr { color: #ffcb6b; }
+  .ok { color: #4ade80; }
+  .warn { color: #fbbf24; }
+  .err { color: #f87171; }
+
+  .explanation {
+    padding: 0 28px 24px;
+  }
+
+  .explanation ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .explanation ul li {
+    font-size: 13.5px;
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border-left: 3px solid var(--border);
+    display: flex;
+    gap: 10px;
+  }
+
+  .explanation ul li.good { border-left-color: var(--green); }
+  .explanation ul li.bad  { border-left-color: var(--red); }
+  .explanation ul li.info { border-left-color: var(--accent); }
+  .explanation ul li.warn { border-left-color: var(--yellow); }
+
+  .divider {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 0;
+    font-style: italic;
+  }
+
+  .compiler-box {
+    background: linear-gradient(135deg, #1a1d27, #1e1b3a);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 32px;
+  }
+
+  .compiler-box h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .compiler-box p {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.7;
+  }
+
+  .compiler-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  @media (max-width: 600px) { .compiler-grid { grid-template-columns: 1fr; } }
+
+  .compiler-card {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .compiler-card h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .compiler-card p {
+    font-size: 13px;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .required-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+
+  .required-table th {
+    background: var(--surface2);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    font-size: 11px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .required-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .required-table tr:last-child td { border-bottom: none; }
+
+  .required-table tr:hover td { background: var(--surface2); }
+
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  .pill-red { background: rgba(248,113,113,.15); color: #f87171; border: 1px solid rgba(248,113,113,.3); }
+  .pill-green { background: rgba(74,222,128,.12); color: #4ade80; border: 1px solid rgba(74,222,128,.25); }
+  .pill-yellow { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Day 11 · React 19 Compiler</div>
+  <h1>Remove Unnecessary <span>useMemo / useCallback</span></h1>
+  <p>Day 11 · ProductCard · React Compiler · when memoization still matters</p>
+</header>
+
+<nav>
+  <a href="#problem">🐛 Problem</a>
+  <a href="#fix" class="active">✅ Fix</a>
+  <a href="#compiler">⚙️ React Compiler</a>
+  <a href="#when">🧠 When Still Needed</a>
+</nav>
+
+<main>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card red">
+      <div class="label">Removed hooks</div>
+      <div class="value">2</div>
+      <div class="sub">useMemo + useCallback</div>
+    </div>
+    <div class="stat-card green">
+      <div class="label">Lines saved</div>
+      <div class="value">4</div>
+      <div class="sub">simpler component</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="label">Compiler handles</div>
+      <div class="value">Auto</div>
+      <div class="sub">React 19+ with compiler flag</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Still manual</div>
+      <div class="value">3</div>
+      <div class="sub">heavy compute · stable refs · external</div>
+    </div>
+  </div>
+
+  <!-- PATTERN 1: PROBLEM -->
+  <section class="pattern" id="problem">
+    <div class="pattern-header">
+      <div class="pattern-icon">🐛</div>
+      <div>
+        <h2>The Problem — Over-memoization</h2>
+        <span class="file-tag">ProductCard.jsx</span>
+        <p>Both <code>useMemo</code> and <code>useCallback</code> are wrapping trivially cheap operations. They cost more than they save.</p>
+      </div>
+    </div>
+    <div class="pattern-body">
+      <div class="code-block">
+        <div class="code-title">
+          <span class="dot dot-red"></span> Before — unnecessary memoization
+        </div>
+        <pre><span class="kw">function</span> <span class="fn">ProductCard</span>({ price }) {
+  <span class="cmt">// ❌ price * 0.18 is a single multiply —</span>
+  <span class="cmt">//    cheaper to run than useMemo's bookkeeping</span>
+  <span class="kw">const</span> tax = <span class="fn">useMemo</span>(
+    () =&gt; price * <span class="num">0.18</span>,
+    [price]
+  );
+
+  <span class="cmt">// ❌ arrow fn is recreated anyway in deps array</span>
+  <span class="cmt">//    and console.log is NOT expensive</span>
+  <span class="kw">const</span> logPrice = <span class="fn">useCallback</span>(
+    () =&gt; <span class="fn">console.log</span>(price),
+    [price]
+  );
+
+  <span class="kw">return</span> (
+    <span class="tag">&lt;div&gt;</span>
+      <span class="tag">&lt;h3&gt;</span>Price: {price}<span class="tag">&lt;/h3&gt;</span>
+      <span class="tag">&lt;button</span> <span class="attr">onClick</span>={logPrice}<span class="tag">&gt;</span>
+        Log
+      <span class="tag">&lt;/button&gt;</span>
+    <span class="tag">&lt;/div&gt;</span>
+  );
+}</pre>
+      </div>
+      <div>
+        <div class="explanation" style="padding: 0;">
+          <ul>
+            <li class="bad">❌ <strong>useMemo for a multiply:</strong> React has to allocate a closure, store deps array, and compare on every render — all for <code>price * 0.18</code>.</li>
+            <li class="bad">❌ <strong>useCallback for console.log:</strong> The function body is trivial. React's overhead for tracking the callback exceeds the cost of recreating it.</li>
+            <li class="bad">❌ <strong>Both depend on <code>price</code>:</strong> So they re-run every time <code>price</code> changes anyway — memoization provides zero benefit here.</li>
+            <li class="info">ℹ️ Memoization is not free. It trades CPU (re-computation) for memory + comparison overhead. Only worthwhile when computation is genuinely expensive.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PATTERN 2: FIX -->
+  <section class="pattern" id="fix">
+    <div class="pattern-header">
+      <div class="pattern-icon">✅</div>
+      <div>
+        <h2>The Fix — Plain variables &amp; inline handlers</h2>
+        <span class="file-tag">ProductCard.jsx</span>
+        <p>Compute directly. React 19 Compiler will automatically memoize the entire component output when props haven't changed.</p>
+      </div>
+    </div>
+    <div class="pattern-body">
+      <div class="code-block">
+        <div class="code-title">
+          <span class="dot dot-green"></span> After — clean, no manual memoization
+        </div>
+        <pre><span class="kw">function</span> <span class="fn">ProductCard</span>({ price }) {
+  <span class="cmt">// ✅ Plain variable — runs inline, zero overhead</span>
+  <span class="kw">const</span> tax = price * <span class="num">0.18</span>;
+
+  <span class="cmt">// ✅ Inline handler — React Compiler will</span>
+  <span class="cmt">//    memoize the whole render if price is stable</span>
+  <span class="kw">return</span> (
+    <span class="tag">&lt;div&gt;</span>
+      <span class="tag">&lt;h3&gt;</span>Price: {price}<span class="tag">&lt;/h3&gt;</span>
+      <span class="tag">&lt;p&gt;</span>Tax: {tax}<span class="tag">&lt;/p&gt;</span>
+      <span class="tag">&lt;button</span>
+        <span class="attr">onClick</span>={() =&gt; <span class="fn">console.log</span>(price)}
+      <span class="tag">&gt;</span>
+        Log
+      <span class="tag">&lt;/button&gt;</span>
+    <span class="tag">&lt;/div&gt;</span>
+  );
+}</pre>
+      </div>
+      <div>
+        <div class="explanation" style="padding: 0;">
+          <ul>
+            <li class="good">✅ <strong>Simpler code:</strong> No hook imports needed for this component. Less cognitive overhead for future readers.</li>
+            <li class="good">✅ <strong>Same performance:</strong> <code>price * 0.18</code> is a nanosecond operation — the JIT will inline it. No measurable difference.</li>
+            <li class="good">✅ <strong>React Compiler (Babel plugin) analyzes this component</strong> and automatically wraps the entire output in a stable memo boundary when <code>price</code> hasn't changed.</li>
+            <li class="info">ℹ️ With React 19 Compiler enabled, you write <em>plain React</em> — the compiler decides what to memoize, not you.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REACT COMPILER SECTION -->
+  <div class="compiler-box" id="compiler">
+    <h2>⚙️ Why React Compiler Handles These Cases</h2>
+    <p>
+      React Compiler (previously "React Forget") is a static analysis tool that ships with React 19. It transforms your source code at build time — before it reaches the browser. It understands React's rules of hooks and component purity, so it can safely infer what needs to be memoized.
+    </p>
+    <p>
+      Manual <code>useMemo</code>/<code>useCallback</code> are <em>hints to React at runtime</em>. The compiler replaces that entire class of hints with <em>compile-time guarantees</em> — making your app faster without the cognitive burden.
+    </p>
+    <div class="compiler-grid">
+      <div class="compiler-card">
+        <h4>🔍 Static Analysis</h4>
+        <p>The compiler reads your component tree and builds a dependency graph. It knows <code>price * 0.18</code> depends only on <code>price</code> — no side effects, no external refs.</p>
+      </div>
+      <div class="compiler-card">
+        <h4>🏷 Automatic Memo Boundaries</h4>
+        <p>It wraps component outputs in optimized memo slots — equivalent to <code>React.memo()</code> but more granular. Subtrees that don't change are skipped entirely.</p>
+      </div>
+      <div class="compiler-card">
+        <h4>⚡ Stable Callbacks</h4>
+        <p>Inline handlers like <code>onClick={() =&gt; console.log(price)}</code> are automatically stabilized when the compiler can prove their closure values haven't changed.</p>
+      </div>
+      <div class="compiler-card">
+        <h4>🛡 Safety Guarantees</h4>
+        <p>The compiler only transforms code that follows React's rules (pure components, no direct mutation). Unsafe patterns are left untouched — no silent breakage.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHEN STILL NEEDED -->
+  <section class="pattern" id="when">
+    <div class="pattern-header">
+      <div class="pattern-icon">🧠</div>
+      <div>
+        <h2>When Memoization Is Still Required</h2>
+        <span class="file-tag">manual override cases</span>
+        <p>The React Compiler cannot handle every case. You still reach for <code>useMemo</code>/<code>useCallback</code> manually in these scenarios:</p>
+      </div>
+    </div>
+    <div class="explanation" style="padding: 24px 28px;">
+      <table class="required-table">
+        <thead>
+          <tr>
+            <th>Case</th>
+            <th>Hook</th>
+            <th>Why compiler can't handle it</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Heavy computation</strong><br><small style="color:var(--muted)">e.g. sorting 10k rows, matrix math, FFT</small></td>
+            <td><code>useMemo</code></td>
+            <td>Compiler memoizes render output, not arbitrary computations that run outside JSX.</td>
+            <td><span class="pill pill-red">Manual required</span></td>
+          </tr>
+          <tr>
+            <td><strong>Stable ref for external lib</strong><br><small style="color:var(--muted)">e.g. passing callback to D3, socket.on(), observer</small></td>
+            <td><code>useCallback</code></td>
+            <td>External libraries hold references outside React's tree — compiler has no visibility there.</td>
+            <td><span class="pill pill-red">Manual required</span></td>
+          </tr>
+          <tr>
+            <td><strong>Custom hook that returns object/array</strong><br><small style="color:var(--muted)">returned value used as useEffect dep</small></td>
+            <td><code>useMemo</code></td>
+            <td>Non-primitive return values change identity every render; compiler won't break that contract.</td>
+            <td><span class="pill pill-yellow">Depends on hook</span></td>
+          </tr>
+          <tr>
+            <td><strong>Context value object</strong><br><small style="color:var(--muted)">e.g. &lt;AuthContext.Provider value={{ user, logout }}&gt;</small></td>
+            <td><code>useMemo</code></td>
+            <td>Context forces all consumers to re-render when value identity changes — compiler v1 doesn't optimize across Provider boundaries.</td>
+            <td><span class="pill pill-red">Manual required</span></td>
+          </tr>
+          <tr>
+            <td><strong>Opt-out of Compiler</strong><br><small style="color:var(--muted)">legacy code, 3rd-party HOCs, non-pure components</small></td>
+            <td>Both</td>
+            <td>Compiler skips components that aren't provably pure. Manual memoization is the only option.</td>
+            <td><span class="pill pill-yellow">Case-by-case</span></td>
+          </tr>
+          <tr>
+            <td><strong>Pre-React 19 codebase</strong><br><small style="color:var(--muted)">React 16–18 without compiler plugin</small></td>
+            <td>Both</td>
+            <td>Compiler is not available. Classic manual memoization is the only optimization tool.</td>
+            <td><span class="pill pill-green">Still valid</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bonus: side-by-side needed vs not needed -->
+    <div class="pattern-body" style="border-top: 1px solid var(--border);">
+      <div class="code-block">
+        <div class="code-title">
+          <span class="dot dot-red"></span> useMemo still needed — heavy sort
+        </div>
+        <pre><span class="kw">function</span> <span class="fn">LeaderBoard</span>({ scores }) {
+  <span class="cmt">// ✅ 10,000 items sorted on every render</span>
+  <span class="cmt">//    Compiler won't hoist this computation</span>
+  <span class="kw">const</span> sorted = <span class="fn">useMemo</span>(
+    () =&gt; [...scores].<span class="fn">sort</span>(
+      (a, b) =&gt; b.score - a.score
+    ),
+    [scores]
+  );
+
+  <span class="kw">return</span> <span class="tag">&lt;VirtualList</span> <span class="attr">items</span>={sorted} <span class="tag">/&gt;</span>;
+}</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-title">
+          <span class="dot dot-red"></span> useCallback still needed — external ref
+        </div>
+        <pre><span class="kw">function</span> <span class="fn">MapView</span>({ onMove }) {
+  <span class="cmt">// ✅ mapbox.on() holds a JS reference outside</span>
+  <span class="cmt">//    React's tree — must be stable identity</span>
+  <span class="kw">const</span> handleMove = <span class="fn">useCallback</span>(() =&gt; {
+    <span class="fn">onMove</span>(map.<span class="fn">getCenter</span>());
+  }, [onMove]);
+
+  <span class="fn">useEffect</span>(() =&gt; {
+    map.<span class="fn">on</span>(<span class="str">'move'</span>, handleMove);
+    <span class="kw">return</span> () =&gt; map.<span class="fn">off</span>(<span class="str">'move'</span>, handleMove);
+  }, [handleMove]);
+
+  <span class="kw">return</span> <span class="tag">&lt;div</span> <span class="attr">id</span>=<span class="str">"map"</span> <span class="tag">/&gt;</span>;
+}</pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+</body></html>

@@ -1,0 +1,28 @@
+<html><head>
+        <meta charset="UTF-8">
+        <style>
+            html, body, iframe { margin: 0; padding: 0; width: 100%; height: 100%; }
+            iframe { display: block; border: none; }
+        </style>
+    </head>
+    <body>
+        <iframe id="inner" src="https://d2z0o16i8xm8ak.cloudfront.net/web/direct-files/190b9304796d3dd0cb097213f0adcbc4/16798fc5-e27b-4e0b-93d7-7db04d95e3b9/84a91968.html?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9kMnowbzE2aTh4bThhay5jbG91ZGZyb250Lm5ldC93ZWIvZGlyZWN0LWZpbGVzLzE5MGI5MzA0Nzk2ZDNkZDBjYjA5NzIxM2YwYWRjYmM0LzE2Nzk4ZmM1LWUyN2ItNGUwYi05M2Q3LTdkYjA0ZDk1ZTNiOS84NGE5MTk2OC5odG1sPyoiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3ODI3NDIxNzV9fX1dfQ__&amp;Signature=L8rTrjTHgNpFxSUNOVxt~hfTcyS--hmuKFivqYH2rteGZWZCDR~67IllA0~uITeajDAqpX0-idS9NuJAYTXczA8QdIVw9IAg-h~BXrjFH6PNAFxNm~j9noOXv7z5gOUED2eilo94kKNqtlIAMrIBJU67oWwH5v~N~eRzeteFARP0Q8SaQx63OBa3kQC9DSKvyhmkkv0cGufHA0z6q2Q4l2ygH5GWxd4Rx7rJkYnpp6N3HNH42RgUSsp7mLC4q4KeVjRB7SrRadve9OmtIbD6IlY~wLZHvpDk5Hk7dy1~l~qNyAimeOVaKDvPlXD9hoYsRHArYP9zN59MY3w29yQNUw__&amp;Key-Pair-Id=K1BF7XGXAIMYNX" title="Embedded App" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads" referrerpolicy="no-referrer" width="100%" height="100%" loading="lazy" style="color-scheme: normal;"></iframe>
+        <script>
+            // Parent -> inner only. Inner posts replies directly to window.top
+            // with the allowlisted parent origin, so a spoofed broker can't
+            // exfil — replies get dropped on delivery.
+            const inner = document.getElementById('inner');
+            const expectedParentOrigin = "https://www.perplexity.ai";
+            const parentToInnerTypes = new Set([
+                'INLINE_EDIT_CAPTURE_REQUEST',
+                'INLINE_EDIT_SCROLL_START',
+                'INLINE_EDIT_SCROLL_STOP',
+            ]);
+            window.addEventListener('message', function(e) {
+                if (e.data && parentToInnerTypes.has(e.data.type) && e.source === window.parent && e.origin === expectedParentOrigin && inner && inner.contentWindow) {
+                    inner.contentWindow.postMessage(Object.assign({}, e.data, { parentOrigin: expectedParentOrigin }), '*');
+                }
+            });
+        </script>
+    
+  </body></html>
